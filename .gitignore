@@ -1,0 +1,47 @@
+# Environment & secrets
+.env
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ML artifacts (large files)
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.onnx
+models/*.bin
+
+# Results (track selectively)
+results/*.csv
+results/*.json
+!results/.gitkeep
+
+# Node (if console grows)
+node_modules/

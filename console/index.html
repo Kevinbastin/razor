@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATRL — Agent Transaction Risk Layer</title>
+    <meta name="description" content="Monitoring console for the Agent Transaction Risk Layer — four-layer risk system for AI-agent-initiated payments.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <span class="logo-icon">◆</span>
+                    <span class="logo-text">ATRL</span>
+                </div>
+                <span class="header-divider"></span>
+                <span class="header-subtitle">Agent Transaction Risk Layer</span>
+            </div>
+            <div class="header-right">
+                <div class="status-badge" id="api-status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Checking...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Stats Row -->
+            <section class="stats-row" id="stats-row">
+                <div class="stat-card">
+                    <div class="stat-label">Transactions Scored</div>
+                    <div class="stat-value" id="stat-scored">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Blocked (L1)</div>
+                    <div class="stat-value stat-danger" id="stat-blocked-l1">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Flagged (L2+L3)</div>
+                    <div class="stat-value stat-warning" id="stat-flagged">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Disputes Filed</div>
+                    <div class="stat-value stat-info" id="stat-disputes">—</div>
+                </div>
+            </section>
+
+            <!-- Placeholder Panels -->
+            <section class="panels">
+                <div class="panel">
+                    <h2 class="panel-title">Layer Pipeline</h2>
+                    <p class="panel-placeholder">Pipeline visualization will appear here once layers are implemented.</p>
+                </div>
+                <div class="panel">
+                    <h2 class="panel-title">Recent Decisions</h2>
+                    <p class="panel-placeholder">Transaction decisions will stream here in real time.</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span>Razorpay AI Builder · Track 02 · v0.1.0</span>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

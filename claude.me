@@ -1,0 +1,494 @@
+# Agent Transaction Risk Layer
+### Razorpay Buildathon — Track 02 (AI Risk Manager) — Full Build Specification
+
+---
+
+## 0. The One-Sentence Pitch
+
+> Existing fraud systems break the moment an AI agent is in the checkout flow — every signal they were trained on (device fingerprint, clickstream, behavioral biometrics) either disappears or describes the agent instead of the human. This is a fraud detection, mandate verification, and dispute-evidence layer purpose-built for agent-initiated payments, built on Razorpay's live mandate and dispute APIs.
+
+Memorise this. It is the sentence that separates you from a generic fraud classifier.
+
+---
+
+## 1. Why This Problem Is Real (Your Evidence Base)
+
+Do not skip this section. In a 5-minute pitch, *proving the problem is real* buys more credibility than any feature demo. Every claim below is sourced and verifiable — cite them in your README and video.
+
+### 1.1 The protocols deliberately left fraud out of scope
+The Agentic Commerce Protocol (ACP, by OpenAI + Stripe) explicitly excludes **fraud modeling, returns/exchanges, and PSP authorization semantics** from its specification. Those responsibilities stay with the merchant's own stack. There is no default solution shipping with the protocol — the hole is by design.
+
+**Implication for you:** you are not competing with the protocol. You are building the layer it declined to build.
+
+### 1.2 Legacy fraud models don't degrade gracefully — they invert
+Industry research is blunt about this: device signals, behavioral biometrics, IP addresses and clickstream patterns either vanish or reflect the agent rather than the user. Fraud models go from useful to *actively misleading*, because an agent's behavior looks — by every metric those models were trained on — like automated fraud.
+
+**Implication for you:** legitimate, fully-authorized agent purchases get blocked as false positives. This is a revenue problem, not just a security problem. Frame it that way to judges: you are recovering good transactions, not just blocking bad ones.
+
+### 1.3 Nobody sees the whole transaction
+No single party has the full picture. The AI provider verified the user at onboarding. The merchant only ever sees the agent. The card issuer works from signals that no longer reflect human intent. Attacks exploit the *gaps between* these actors rather than weaknesses within any one of them.
+
+### 1.4 The evidence gap and unresolved liability
+Merchants under agentic checkout carry the liability without the evidence infrastructure to defend a dispute — the chargeback process was built assuming a human initiated the purchase. A survey of 500 senior fraud/risk/security professionals found **no consensus at all** on who pays when an agent transaction goes wrong: ~39% said the AI provider, 20% the customer, 14% the merchant/platform, 11% the bank, 15% wanted a shared model.
+
+**Implication for you:** your evidence generator isn't a nice-to-have. It is the artifact that resolves an argument the industry cannot currently settle.
+
+### 1.5 Speed turns a single error into a systemic one
+An erroneous or fraudulent agent transaction that a human would have caught at the checkout moment can now replicate across thousands of orders before anyone notices. Detection latency matters more than in human commerce.
+
+### 1.6 Prompt injection is already draining agent wallets in the wild
+This is the newest and most underrated part of the threat surface:
+
+- Security researchers documented live campaigns using **SEO poisoning** and hidden instructions in web content to trick payment-capable AI agents into executing transactions — including payloads containing fully-specified transaction details (recipient, amount, description) with step-by-step instructions to execute without user confirmation.
+- Google researchers observed a **32% increase in malicious prompt-injection payloads** embedded in web content between November 2025 and February 2026.
+- In a public red-teaming competition against deployed agents, 1.8 million injection attempts produced **more than 60,000 successful policy violations**.
+- Brave's security team demonstrated indirect injection against an AI browser using instructions invisible to the user (white text on white background, HTML comments), causing cross-site actions including fetching OTPs and touching banking portals — from a request as innocuous as "summarize this page."
+
+**Implication for you — and this is your single strongest differentiator:** in an injected-intent attack, *the agent is legitimate, the credential is valid, the mandate is active, and the amount is within limits.* Every existing control passes it. The only thing that is wrong is the **intent**. Nothing in the current stack detects that. See §3.4.
+
+### 1.7 What the big networks are building (and why you're not duplicating them)
+Visa's Trusted Agent Protocol and Mastercard's Agent Pay / Verifiable Intent are network-level answers to this. Mastercard binds an Agentic Token to an agent identity plus cardholder mandates (spend ceilings, merchant categories, time windows, recurring rules). Visa attaches a signed-intent payload and agent credentials, with agent providers pre-registering keys.
+
+**Use this two ways:**
+1. As validation — "the card networks are building exactly this layer, which tells you the problem is real."
+2. As design guidance — their signal taxonomy tells you what a technically credible version looks like. You are building the **merchant-side** equivalent for the Indian/UPI/Razorpay context, which they do not cover.
+
+**Do not overclaim.** You are not reimplementing TAP. You are building the merchant-side risk layer that consumes these kinds of signals.
+
+---
+
+## 2. Architecture
+
+```
+                  ┌─────────────────────────────────┐
+                  │   SIMULATED AGENT TRAFFIC        │
+                  │  (quick-commerce merchant)       │
+                  │  legit sessions + 6 attack classes│
+                  └────────────────┬────────────────┘
+                                   │
+                  ┌────────────────▼────────────────┐
+                  │  LAYER 1 — MANDATE VERIFIER      │  deterministic
+                  │  Is this inside granted authority?│  fast · explainable
+                  └────────────────┬────────────────┘
+                          pass     │     fail → block + reason trail
+                                   │
+                  ┌────────────────▼────────────────┐
+                  │  LAYER 2 — BEHAVIORAL DETECTOR   │  ML
+                  │  Does the session *shape* fit?    │  precision/recall
+                  └────────────────┬────────────────┘
+                          pass     │     anomalous → step-up / hold
+                                   │
+                  ┌────────────────▼────────────────┐
+                  │  LAYER 3 — INTENT INTEGRITY      │  ← your novel core
+                  │  Was the goal hijacked?           │
+                  └────────────────┬────────────────┘
+                                   │
+                  ┌────────────────▼────────────────┐
+                  │  LAYER 4 — EVIDENCE / RESPONDER  │  LLM
+                  │  Dispute packet + liability call  │  → Razorpay disputes API
+                  └────────────────┬────────────────┘
+                                   │
+                  ┌────────────────▼────────────────┐
+                  │  MERCHANT CONSOLE (thin UI)      │
+                  └─────────────────────────────────┘
+```
+
+**Why layered rather than one model:** deterministic checks are fast, free and fully explainable, so they should run first and catch the obvious. ML runs only on what survives. This is how real risk systems are built, and saying so signals maturity. It also means a failure in your ML layer degrades gracefully instead of taking the system down.
+
+---
+
+## 3. The Four Layers — Full Feature Detail
+
+### 3.1 Layer 1 — Mandate Verifier (deterministic)
+
+**Razorpay primitives to build on:** the TPAP Pro Mandate APIs give you create / update / revoke / pause / resume / approve / reject / fetch. Mandates carry an amount, an amount rule (`max` vs `exact`), a Unique Mandate Number (UMN), payer and payee details, device details, and timestamps.
+
+**The core abstraction — state this explicitly in your README and pitch:**
+> Razorpay has no first-class "AI agent" object. I model an agent's delegated authority using the **mandate** primitive: a mandate is a scoped, revocable, user-approved grant of spending authority — structurally the same thing Mastercard's Agentic Token and NPCI's UAP consent model express. Every check below runs against that grant.
+
+Being upfront about this is a strength. A judge who spots an unexplained gap will doubt you; a judge who sees you name the abstraction and justify it will credit you for systems thinking.
+
+**Checks to implement:**
+
+| # | Check | What it catches | Data source |
+|---|---|---|---|
+| V1 | Amount vs. mandate ceiling (respecting `max` vs `exact`) | Over-limit execution | Mandate amount + rule |
+| V2 | Merchant / category scope | Agent buying outside permitted categories | Payee details vs. allowed set |
+| V3 | Time-window validity | Off-schedule execution | Mandate start/end timestamps |
+| V4 | Lifecycle state (active / paused / revoked / rejected) | Use of a revoked or paused grant | Fetch Mandates API |
+| V5 | UMN integrity & uniqueness | Malformed or duplicated mandate references | UMN field |
+| V6 | Signature / key attestation (simulated) | Spoofed agent identity | Your simulated agent key registry |
+| V7 | Cumulative spend against mandate budget | Slow drain via many small in-limit charges | Your own ledger |
+| V8 | Cadence vs. recurring rule | Higher frequency than authorized | Mandate rule + history |
+
+**Critical output design:** emit a **structured reason trail**, not a log line. Something like:
+
+```json
+{
+  "verdict": "fail",
+  "failed_checks": ["V1", "V7"],
+  "evidence": {
+    "V1": {"txn_amount": 4200, "mandate_ceiling": 2000, "rule": "max"},
+    "V7": {"cumulative_spend": 18400, "budget": 20000, "window": "2026-08"}
+  },
+  "mandate_snapshot": {"umn": "...", "state": "active", "granted_at": "..."}
+}
+```
+
+Build this on day one. Layer 4 consumes it directly, and reason trails are what make the whole system explainable — a huge scoring advantage over a black-box classifier.
+
+---
+
+### 3.2 Layer 2 — Behavioral Detector (ML — your precision/recall centerpiece)
+
+The track brief asks for *"measured precision and recall on a held-out test set."* This layer produces that number.
+
+**The insight that makes this novel:** you cannot use human behavioral signals — the research says plainly they're gone or misleading. So model the **session shape** instead: the sequence, timing and structure of API calls, not the human behind them.
+
+**Feature families:**
+
+**A. Sequence features**
+- N-gram profile of the API call sequence (`discover → cart → consent → pay` vs. anomalous orderings)
+- Skip-ahead detection: payment without a preceding cart/consent step
+- Sequence edit-distance from that mandate's own historical modal path
+- Retry/backoff structure — real agents retry with backoff, scripts often don't
+- Abandoned-step ratio
+
+**B. Timing features**
+- Inter-step latency distribution (mean, variance, min)
+- **Variance is the money feature:** genuine LLM agents have *irregular* latency because inference time varies with context; replay scripts are suspiciously uniform. Low variance is a strong tell.
+- Total session duration vs. cart complexity
+- Time-of-day plausibility against the mandate's own history
+
+**C. Credential / token features**
+- Consent-token reuse across distinct sessions (replay)
+- Token age at time of use
+- Key-rotation anomalies
+- Same UMN appearing from divergent device fingerprints
+
+**D. Velocity & drift features**
+- Transactions per mandate per hour/day vs. authorized cadence
+- Burst detection (n transactions in a short window)
+- Per-mandate personalized baseline drift — z-score against that mandate's *own* history, not a global threshold. Personalized baselines materially outperform global rules and are worth calling out.
+- Basket-composition drift (sudden shift in categories or item mix)
+
+**E. Cross-entity graph features (stretch — high payoff)**
+- Mandates sharing a device fingerprint or signing key
+- Connected-component size in the mandate↔device↔key graph
+- Velocity of *new mandate creation* per device — the coordinated-ring signal
+
+**Modeling approach — be pragmatic:**
+1. **Baseline:** gradient-boosted trees (XGBoost / LightGBM) on aggregated features. Fast, strong, interpretable. Ship this first.
+2. **Sequence model (if time permits):** a small LSTM/GRU or transformer over the raw call sequence. Only attempt after the baseline works end-to-end.
+3. **Unsupervised companion:** Isolation Forest for novel attack classes you didn't simulate. Real-world value here: you cannot label attacks that don't exist yet.
+
+**Reporting — do this properly, it's your credibility anchor:**
+- Precision, recall, F1, PR-AUC (not just ROC-AUC — your classes are imbalanced, and knowing that distinction signals you understand the domain)
+- Per-attack-class breakdown — which classes you catch well and which you don't
+- **Threshold justification with an explicit cost model.** A false positive blocks a legitimate customer's agent; a false negative loses money. State your assumed rupee cost for each and show the threshold that minimizes total expected loss. Very few student projects do this, and it reads as commercially literate.
+- A confusion matrix at your chosen operating point
+- Feature importance (SHAP if you can) — ties back to explainability
+
+**Non-negotiable:** freeze the held-out split *before* you start modeling, and never touch it until final evaluation. If a judge suspects leakage, every number you present dies.
+
+---
+
+### 3.3 Layer 3 — Intent Integrity (your novel core)
+
+**This is the layer nobody else will build, and it's the reason the project is defensible.**
+
+The scenario: prompt injection hijacks the agent mid-task. The agent is genuine. The credential is valid. The mandate is active. The amount is inside the ceiling. **Layers 1 and 2 both pass it.** The only thing wrong is that the *goal* was replaced by attacker-controlled content the agent read while browsing.
+
+Existing controls are structurally blind to this, because they all validate authority and behavior — never intent.
+
+**Detection strategies:**
+
+**I1 — Intent/outcome semantic divergence**
+Capture the user's original stated goal at mandate creation (e.g. "weekly grocery top-up under ₹2000"). At transaction time, compute semantic similarity between that stated intent and the actual cart contents. A grocery mandate suddenly purchasing gift cards or electronics is a divergence flag even if every amount check passes. Use embeddings; threshold on cosine distance.
+
+**I2 — Content-source provenance tracking**
+Log every external content source the agent touched during the session. Flag transactions whose decisive step immediately follows exposure to a low-reputation, newly-registered, or previously-unseen domain. This directly targets the SEO-poisoning pattern researchers documented.
+
+**I3 — Injected-payload signature scanning**
+Scan content the agent ingested for the structural fingerprints of injection payloads: imperative instruction blocks aimed at agents, fully-specified transaction parameters embedded in page content, invisible text (white-on-white, zero-opacity, HTML comments), and instructions to bypass confirmation. This is a well-documented attack surface with recognisable structure.
+
+**I4 — Beneficiary novelty check**
+Is the payee an entity this mandate has ever transacted with? First-time-beneficiary plus high-value plus off-pattern timing is a classic escalation triple — and it maps cleanly onto attacker-controlled endpoints.
+
+**I5 — Reasoning-trace coherence (advanced, high-ceiling)**
+If you capture the agent's reasoning trace, use an LLM-as-judge to score whether the stated justification for this purchase coheres with the original mandate purpose. Hijacked agents produce justifications that are internally fluent but disconnected from the original goal.
+
+**How to present this:** *"Layers 1 and 2 answer 'is this agent allowed to spend?' Layer 3 answers 'is this agent still doing what the user asked?' The industry has good answers to the first question and no answer to the second."*
+
+That framing alone is worth building the project for.
+
+---
+
+### 3.4 Layer 4 — Evidence Generator & Auto-Responder
+
+**Razorpay primitives:** the Disputes API supports fetching all disputes, fetching one by ID (with expandable payment and settlement details), **accepting** a dispute, and **contesting** it with explanations and supporting documents. There's a Documents API for attaching files. This is a genuine end-to-end integration, not a mock.
+
+**What the evidence packet contains:**
+1. Mandate snapshot at transaction time — scope, ceiling, state, granted-at timestamp
+2. Consent record — when and how authority was granted
+3. Full verifier reason trail (Layer 1)
+4. Risk score plus top contributing features (Layer 2)
+5. Intent-integrity assessment (Layer 3)
+6. Session timeline — every API call with timestamps
+7. Fulfilment evidence — delivery confirmation, etc.
+8. **Liability determination** with reasoning
+
+**The liability logic — this is what makes it valuable given the industry has no consensus:**
+
+| Finding | Determination |
+|---|---|
+| Stayed fully inside mandate scope, intent coherent | Merchant-defensible: authority was validly granted and respected |
+| Breached mandate scope | Merchant should accept — authority was exceeded |
+| Valid mandate but intent hijacked (injection detected) | Escalate: neither party clearly at fault; flag for the AI provider |
+| Credential replay / spoofed agent | Fraud — contest with attestation failure evidence |
+
+That third row is the interesting one, and it's exactly the case the 500-professional survey couldn't agree on. Producing a defensible position on it is a real contribution.
+
+**Where the LLM belongs:** converting the structured packet into a clear, persuasive, plain-English dispute narrative for submission. Keep the *determination* deterministic and rule-based; use the LLM only for the write-up. Never let the model invent facts — pass it only fields from the packet, and say so in your README. Judges will respect the discipline of not putting an LLM where a rule belongs.
+
+**Auto-responder actions beyond disputes:**
+- Step-up re-authorization instead of a hard block for medium-risk transactions (this is the false-positive killer — it recovers legitimate revenue rather than destroying it)
+- Auto-pause a mandate on high-confidence compromise (Razorpay's mandate API supports pause/resume directly)
+- Notify the user with a specific, human-readable reason
+
+---
+
+### 3.5 The Merchant Console (thin, but do not skip it)
+
+Three backend components with no UI reads as three scripts. The same components behind a console read as a product. In a 5-minute video this is decisive.
+
+Minimum viable console:
+- Live transaction feed with per-layer verdicts
+- Drill-down: reason trail, risk score, top features, intent assessment
+- Dispute queue with generated evidence packets
+- **Value counter:** disputes auto-resolved, false positives avoided, ₹ defended
+- Mandate management view (pause/resume/revoke)
+
+Keep it simple and clean. This is a supporting actor, not the star. Do not spend week 4 on CSS.
+
+---
+
+## 4. Data Simulation Plan
+
+Everything depends on this being credible. Weak simulation → meaningless precision/recall.
+
+**Scope it to a quick-commerce merchant** (grocery / food delivery). NPCI has publicly indicated the first agentic use cases will be low-value high-frequency — groceries, routine bills — and Razorpay's own live agentic pilot ran with Zomato, Swiggy and Zepto. Matching that context ties your work to their actual roadmap.
+
+**Scale:** ~500 mandates, ~50,000 transactions, roughly 2–4% attack prevalence. Realistic imbalance matters — a 50/50 split makes your metrics meaningless and a judge will notice immediately.
+
+**Legitimate traffic must be genuinely varied**, or your model learns "anything unusual = fraud":
+- Different agent types with different latency profiles
+- Weekday/weekend and time-of-day rhythms
+- Basket size variation, seasonal spikes, legitimate retries after network failures
+- Legitimate mandate updates and user-initiated pauses
+
+**The six attack classes:**
+
+| # | Class | Layer that should catch it |
+|---|---|---|
+| A1 | Consent-token replay | L2 (token reuse, timing uniformity) |
+| A2 | Spoofed agent identity | L1 (V6 attestation) |
+| A3 | Over-ceiling burst | L1 (V1, V7) |
+| A4 | Off-window / revoked-mandate use | L1 (V3, V4) |
+| A5 | Slow drain — many small in-limit charges | L2 (velocity, cumulative drift) |
+| A6 | **Injected intent — everything valid, goal hijacked** | **L3 only** |
+
+A6 is the demo that wins the room: show Layers 1 and 2 both passing it cleanly, then Layer 3 catching it. That single visual makes the case for the entire project.
+
+**Also simulate hard negatives** — legitimate transactions that superficially resemble attacks (a genuine bulk festival order, a legitimate new-beneficiary purchase). Your false-positive rate is only meaningful if the negatives are actually hard.
+
+**Reproducibility:** seed your RNG, version the generator, commit the config. A judge should be able to regenerate your dataset exactly.
+
+---
+
+## 5. Four-Week Plan
+
+**Week 1 — Foundations**
+- Razorpay test account; explore mandate + dispute APIs by hand before writing code
+- Build the data generator; produce v1 dataset
+- **Freeze the held-out split now**
+- Implement Layer 1 fully (deterministic, no ML — you can finish it this week)
+- Write the problem doc with the §1 citations
+- *Milestone: Layer 1 catches A2–A4 with a clean reason trail.*
+
+**Week 2 — ML core**
+- Feature engineering pipeline (families A–D; E if ahead)
+- Train baseline GBM; first honest precision/recall
+- Per-class breakdown; identify what's missed
+- Add Isolation Forest for novelty
+- *Milestone: a real number you'd defend under questioning.*
+
+**Week 3 — Novelty + integration**
+- Build Layer 3 (start with I1 and I4 — highest value per hour; add I2/I3 if time)
+- Build Layer 4 evidence generator; wire to the real disputes-contest endpoint
+- Step-up re-auth flow
+- Console v1
+- *Milestone: end-to-end A6 demo — L1 and L2 pass, L3 catches.*
+
+**Week 4 — Harden and tell the story**
+- Cost-model threshold tuning; final held-out evaluation (touch it **once**)
+- README: problem, architecture, the mandate abstraction stated plainly, metrics, limitations
+- Architecture diagram
+- Record the pitch
+- *Milestone: a stranger can clone the repo and reproduce your numbers.*
+
+**Cut list if you fall behind** (decide now, not at 2am in week 4): drop the sequence model, drop graph features, drop I3/I5, drop console polish. **Never cut:** Layer 1, the baseline model with honest metrics, one working Layer 3 signal, the A6 demo.
+
+---
+
+## 6. The Pitch (5 minutes)
+
+| Time | Content |
+|---|---|
+| 0:00–0:45 | **Problem.** Agent payments are live in India. ACP excludes fraud by design. Legacy models don't just degrade — they invert, because an agent looks like a bot to every signal they use. |
+| 0:45–1:30 | **The gap nobody's covering.** Show A6: valid agent, valid credential, valid mandate, in-limit amount — and the purchase was dictated by a poisoned webpage. Every existing control passes it. |
+| 1:30–3:00 | **The system.** Walk the four layers. Live demo: A3 blocked at L1, A1 caught at L2, **A6 caught only at L3**. |
+| 3:00–4:00 | **The numbers.** Precision/recall per attack class, threshold justified by cost model, honest statement of what you miss. |
+| 4:00–4:45 | **Evidence + liability.** Show the auto-generated dispute packet resolving the case the industry survey couldn't agree on. |
+| 4:45–5:00 | **Limitations and what's next.** |
+
+**Open with the problem, not the architecture.** The strongest signal you can send is that you found a real unsolved problem before you wrote a line of code.
+
+**Lead with limitations, don't hide them.** Volunteering "here's what my simulation can't capture and here's what I'd need real traffic to validate" is the single most credible thing a student builder can do. It reads as research maturity. Hiding it and getting caught in the panel reads as the opposite.
+
+---
+
+## 7. Honest Risk Register
+
+Know these before a judge finds them.
+
+| Risk | Mitigation |
+|---|---|
+| **Synthetic data can't fully prove real-world performance** | State it plainly. Emphasise that your generator encodes documented, cited attack patterns — not invented ones. Report per-class results so limits are visible. |
+| **"Razorpay has no agent object"** | Answer it before they ask. The mandate-as-delegated-authority abstraction is deliberate and defensible — say so in the README and the video. |
+| **Scope creep across four layers** | Layer 1 is finishable in week 1 and works standalone. Ship depth-first, not breadth-first. |
+| **Layer 3 is ambitious** | I1 (semantic divergence) and I4 (beneficiary novelty) are both implementable in days. Start there. |
+| **Someone else picks Track 02** | Likely. But almost nobody will build the *intent* layer, because arriving there requires reading injection research most entrants won't touch. Your defensibility is L3, not the track. |
+| **Overclaiming vs. Visa/Mastercard** | Never imply you reimplemented TAP. You built the merchant-side layer for the Razorpay/UPI context. Accurate and still impressive. |
+
+---
+
+## 8. Repo Structure
+
+```
+agent-risk-layer/
+├── README.md                  ← problem, evidence, architecture, metrics, limitations
+├── ARCHITECTURE.md
+├── docs/
+│   ├── threat-model.md        ← the six attack classes, with citations
+│   ├── mandate-abstraction.md ← why a mandate models agent authority
+│   └── evaluation.md          ← methodology, splits, cost model
+├── simulator/                 ← seeded, versioned, config-driven
+├── layer1_verifier/
+├── layer2_detector/
+├── layer3_intent/
+├── layer4_evidence/
+├── console/
+├── integrations/razorpay/     ← mandate + dispute API clients
+├── notebooks/
+└── results/                   ← metrics, confusion matrices, SHAP plots
+```
+
+**README must include:** the one-sentence pitch, a "why this matters" section with the §1 citations, the architecture diagram, a reproducible quickstart, the metrics table, and a limitations section. Judges read READMEs before they watch videos.
+
+---
+
+## 9. Verify Before You Build
+
+Do these in your first two days — they can change your plan:
+
+1. Create a Razorpay test account and confirm which mandate endpoints you can actually exercise. TPAP Pro may have access requirements; if mandates are restricted, **Subscriptions** is your fallback primitive for delegated authority — the abstraction still holds.
+2. Confirm you can create a test dispute and hit the contest-with-evidence endpoint.
+3. Read the ACP spec's scope section yourself so you can speak to it firsthand.
+4. Skim one primary source on agentic prompt injection so you can describe the attack accurately under questioning.
+
+If an endpoint turns out to be inaccessible, adapt the abstraction rather than abandoning the project — and document the constraint in the README. Working around a real platform limitation and saying so is engineering; pretending it didn't exist is not.
+
+---
+
+## 10. What Actually Wins This
+
+Most entries will be a model on a public fraud dataset, or an LLM wrapper that looks impressive once.
+
+Yours is different on four axes, in descending order of importance:
+
+1. **A real, cited, currently-unsolved problem** — found before building, not retrofitted after.
+2. **The intent layer** — a failure mode with no existing answer, demonstrated live.
+3. **Honest measurement** — held-out set, per-class results, cost-justified threshold, stated limits.
+4. **Real integration** — Razorpay's actual mandate and dispute endpoints, end to end.
+
+If you finish only Layers 1, 2 and one working Layer 3 signal, with honest metrics and the A6 demo — that is already a stronger submission than a polished demo of something that doesn't measure anything.
+
+Build depth-first. Measure honestly. Lead with the problem.
+
+---
+
+## 11. Making It Read as Enterprise-Grade
+
+More detection features do not make a project enterprise-grade. A payments company judges "enterprise-grade" on a completely different axis: **can this survive contact with real money, real attackers, and real auditors?** That's mostly invisible in a demo unless you deliberately surface it. You cannot fully *build* all of this in a month as a solo builder — and trying to would sink your core features. What you can do is **implement a thin, real slice of each category and document the rest as a designed-for roadmap.** That combination — some working, all designed — is what actually reads as senior thinking to a judge who's shipped production payment systems.
+
+### 11.1 Security & compliance posture
+
+- **Secrets management** — Razorpay API keys never in code or committed config. Use environment variables or a vault; `.env.example` in the repo, real `.env` gitignored. This is a one-line fix that a surprising number of student submissions get wrong, and it's the first thing a technical judge checks.
+- **Least privilege** — your service should hold only the Razorpay scopes it needs (disputes, mandates), not a full-access key. State this explicitly even if your test setup doesn't enforce it.
+- **PII minimization** — decide up front what customer/agent data you actually need to store vs. what you can hash or drop. Document a retention policy, even a simple one ("session logs purged after 90 days").
+- **Encryption posture** — state your assumption (TLS in transit, encryption at rest via your DB provider) even if you didn't build custom crypto. Judges want to see you know the requirement exists.
+- **Regulatory awareness** — one paragraph in your README mapping your system to the actual frameworks it would need to respect in production: RBI's data localization and payment aggregator guidelines, and PCI-DSS if card data ever touches your layer. You don't need compliance certification — you need to show you know it's coming.
+
+### 11.2 Reliability & observability
+
+- **Structured logging** — every decision from every layer emitted as structured JSON (not print statements), so it's queryable. This single choice makes your evidence packets (§3.4) trivial instead of hand-built.
+- **Idempotency keys** on any state-changing call (pausing a mandate, contesting a dispute) — prevents duplicate actions on retry, which matters enormously once real money is involved.
+- **Retries with exponential backoff + circuit breakers** around your Razorpay API calls — a payments system that falls over when an upstream API blips is not enterprise-grade, it's a script.
+- **A stated latency budget per layer** — e.g., "Layer 1 must resolve in <50ms, Layer 2 in <200ms, since checkout can't hang." You don't have to hit real production numbers, but naming the budget shows you understand payments is latency-sensitive in a way batch ML isn't.
+- **Basic metrics/dashboarding** — even a simple counts-and-latency panel (verdicts per layer, false-positive rate over time) signals you're thinking about *running* the system, not just training a model once.
+
+### 11.3 Testing rigor beyond the ML metrics
+
+- **Unit tests** for each verifier check (V1–V8) — deterministic logic is exactly the kind of thing that should never regress silently.
+- **An adversarial test suite for Layer 3** — a small, versioned set of known injection patterns (drawn from the documented campaigns you already cited) that must always be caught. This is your regression net against the most novel part of your system, and having one at all is rare for a student project.
+- **A model regression check** — before any retrain, the new model must not underperform the old one on the frozen held-out set. Even a simple assert-based check communicates you understand model rollback risk.
+- **Chaos-lite testing** — deliberately feed the pipeline malformed mandate data, a missing field, an out-of-order webhook. Show it fails safely (denies/flags) rather than crashing or silently approving. In payments, *fail closed* is the correct default and stating that explicitly is a real signal.
+
+### 11.4 Model governance
+
+- **Versioning** — every model artifact tagged with the data snapshot and feature-set version that produced it. Untraceable models are a real production liability and judges with ML backgrounds will ask about this.
+- **Drift monitoring design** — you don't need live production traffic to implement this, but describe how you'd detect that agent behavior has shifted enough that the model needs retraining (e.g., population stability index on your key features).
+- **A retraining cadence and rollback plan** — one paragraph is enough: what triggers a retrain, who/what approves promoting a new model, how you'd roll back a regression.
+- **Fairness/consistency check across attack classes** — confirm your model isn't achieving good aggregate metrics by ignoring one attack class entirely (this is a common, judge-visible failure mode — always show the per-class breakdown from §3.2, not just an aggregate number).
+
+### 11.5 API and platform design
+
+- **Versioned API surface** for your own service (`/v1/...`), even if you're the only consumer — shows you're building a platform, not a script.
+- **Multi-tenancy boundary** — if this served multiple merchants, mandate data and risk models must not leak across tenants. State the isolation model (per-merchant namespace, at minimum) even if your demo only has one simulated merchant.
+- **Rate limiting on your own endpoints** — one sentence acknowledging this exists as a requirement is enough at hackathon scale.
+- **Auth on your console** — don't leave the merchant dashboard open with no login. Even a minimal auth layer avoids an obvious "this couldn't ship" objection.
+
+### 11.6 Documentation as an artifact, not an afterthought
+
+Enterprise systems are judged partly on whether someone *other than the author* could operate them. Add:
+
+- **A runbook** — "if the false-positive rate spikes, do X; if Layer 3 latency degrades, do Y." Even three entries signals operational maturity.
+- **An incident-response sketch** — if a rogue-agent attack gets through, what's the response sequence? Detect → contain (pause mandate) → notify → post-mortem. This maps directly onto real fintech incident processes.
+- **A decision log** — a short file recording key design tradeoffs and why you made them (e.g., "chose GBM over a sequence model for Layer 2 because interpretability mattered more than marginal recall gain at this data volume"). This is one of the highest-signal, lowest-effort additions you can make — it shows judgment, not just output.
+
+### 11.7 What to actually implement vs. what to document
+
+Be deliberate about this split — attempting all of it will wreck your core detection work:
+
+| Implement for real | Document as designed-for |
+|---|---|
+| Secrets via env vars, no hardcoded keys | Full RBI/PCI-DSS compliance mapping |
+| Structured JSON logging | Live drift-monitoring dashboard |
+| Idempotency keys on state-changing calls | Multi-region failover |
+| Unit tests on Layer 1 checks | Full auth/RBAC system |
+| Adversarial regression suite for Layer 3 | Production retraining pipeline automation |
+| Fail-closed behavior on malformed input | Horizontal autoscaling |
+| A one-page runbook and decision log | SOC2-style audit trail |
+
+A judge from a payments company will recognize this split immediately, and recognize it *favorably* — it's exactly how real engineering teams scope a v1. Claiming you built full enterprise infrastructure in a month, when you obviously didn't, reads as less credible than honestly showing you know what production would require and made deliberate, stated tradeoffs to ship a working core in the time you had.
