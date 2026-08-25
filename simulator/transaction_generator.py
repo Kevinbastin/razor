@@ -245,18 +245,42 @@ def _generate_cart(
     purpose_template = merchant_config.purpose_templates[purpose_idx]
 
     if is_a6_attack:
-        # Injected intent — cart doesn't match purpose
+        # Injected intent — cart items don't match purpose, BUT the MCC/category
+        # IS within the mandate's permitted scope. This is what makes A6 invisible
+        # to Layer 1 and catchable ONLY by Layer 3 (intent integrity).
+        # The attack hijacked the agent's goal, not its authority.
         off_items = list(rng.choice(
             merchant_config.off_purpose_items,
             size=int(rng.integers(1, 4)),
             replace=False,
         ))
-        off_cat = rng.choice(merchant_config.off_categories)
+
+        # Use a permitted category from the mandate (so V2 passes)
+        permitted_cats = mandate.get("permitted_categories")
+        if isinstance(permitted_cats, str):
+            try:
+                import json as _json
+                permitted_cats = _json.loads(permitted_cats)
+            except Exception:
+                permitted_cats = None
+        if permitted_cats and len(permitted_cats) > 0:
+            cat_name = rng.choice(permitted_cats)
+        else:
+            # Fallback to purpose template category
+            cat_name = rng.choice(purpose_template["categories"])
+
+        # Find MCC for the chosen (permitted) category
+        mcc = "5411"  # default grocery
+        for c in merchant_config.permitted_categories:
+            if c["name"] == cat_name:
+                mcc = c["mcc"]
+                break
+
         return {
             "items": off_items,
-            "category": off_cat["name"],
-            "mcc": off_cat["mcc"],
-            "matches_purpose": False,
+            "category": cat_name,       # CORRECT category (passes V2)
+            "mcc": mcc,                 # CORRECT MCC (passes V2)
+            "matches_purpose": False,   # But items don't match (Layer 3 signal)
         }
     else:
         # Legitimate cart
@@ -403,10 +427,13 @@ def _generate_a6_injected_intent(
     This simulates a prompt-injection that hijacked the agent's payment goal.
     """
     # Amount is deliberately within limits to pass Layer 1
-    amount = float(rng.integers(
-        max(50, int(mandate["amount_ceiling"] * 0.4)),
-        mandate["amount_ceiling"] + 1,
-    ))
+    if mandate.get("amount_rule") == "exact":
+        amount = float(mandate["amount_ceiling"])
+    else:
+        amount = float(rng.integers(
+            max(50, int(mandate["amount_ceiling"] * 0.4)),
+            mandate["amount_ceiling"] + 1,
+        ))
     return {
         "amount": amount,
         "intent_hijacked": True,
@@ -423,52 +450,51 @@ def _generate_hard_negative(
     config: SimulatorConfig,
 ) -> dict:
     """Generate a legitimate transaction that superficially resembles an attack."""
-    if hn_type == "bulk_festival_order":
+    if mandate.get("amount_rule") == "exact":
+        amount = float(mandate["amount_ceiling"])
+    elif hn_type == "bulk_festival_order":
         # High amount near ceiling — looks like A3 but legitimate
         amount = float(rng.integers(
             int(mandate["amount_ceiling"] * 0.85),
             mandate["amount_ceiling"] + 1,
         ))
-        return {"amount": amount, "hn_reason": "festival_bulk_order"}
-
     elif hn_type == "first_time_beneficiary":
         # New beneficiary — looks like A6 but legitimate
         amount = float(rng.integers(
             max(50, int(mandate["amount_ceiling"] * 0.3)),
             int(mandate["amount_ceiling"] * 0.7) + 1,
         ))
-        return {"amount": amount, "hn_reason": "genuine_new_beneficiary"}
-
     elif hn_type == "late_night_order":
         # Edge of time window — looks like A4 but within bounds
         amount = float(rng.integers(
             max(50, int(mandate["amount_ceiling"] * 0.2)),
             int(mandate["amount_ceiling"] * 0.6) + 1,
         ))
-        return {"amount": amount, "hn_reason": "late_night_legitimate", "force_edge_hour": True}
-
     elif hn_type == "rapid_retry_after_fail":
         # Quick succession — looks like A1 replay but genuine retry
         amount = float(rng.integers(
             max(50, int(mandate["amount_ceiling"] * 0.3)),
             int(mandate["amount_ceiling"] * 0.8) + 1,
         ))
-        return {"amount": amount, "hn_reason": "genuine_retry", "force_retry": True}
-
     elif hn_type == "high_value_single":
         # Near ceiling single purchase — looks like A3 but under
         amount = float(rng.integers(
             int(mandate["amount_ceiling"] * 0.90),
             mandate["amount_ceiling"] + 1,
         ))
-        return {"amount": amount, "hn_reason": "high_value_legitimate"}
-
     else:
         amount = float(rng.integers(
             max(50, int(mandate["amount_ceiling"] * 0.3)),
             int(mandate["amount_ceiling"] * 0.7) + 1,
         ))
-        return {"amount": amount, "hn_reason": "generic_hard_negative"}
+
+    flags = {}
+    if hn_type == "late_night_order":
+        flags["force_edge_hour"] = True
+    elif hn_type == "rapid_retry_after_fail":
+        flags["force_retry"] = True
+
+    return {"amount": amount, "hn_reason": hn_type, **flags}
 
 
 # ── Main transaction generator ───────────────────────────────────────
@@ -489,10 +515,10 @@ def generate_transactions(
 
     now = datetime(2025, 8, 25, 12, 0, 0, tzinfo=IST)
 
-    # Only generate transactions against active/paused mandates
-    # (revoked/expired mandates only get attack transactions)
+    # Only generate legitimate transactions against active mandates
+    # (paused/revoked/expired mandates only get attack transactions like A4)
     active_mandates = mandates_df[
-        mandates_df["lifecycle_state"].isin(["active", "paused"])
+        mandates_df["lifecycle_state"] == "active"
     ].to_dict("records")
     all_mandates = mandates_df.to_dict("records")
 
@@ -683,12 +709,12 @@ def generate_transactions(
     for i in range(n_attacks):
         attack_class = attack_classes[attack_assignments[i]]
 
-        # A4 attacks specifically target revoked/expired mandates sometimes
+        # A4 attacks specifically target non-active (paused/revoked/expired) mandates
         if attack_class == "A4_off_window_revoked" and rng.random() < 0.5:
-            revoked_mandates = mandates_df[
-                mandates_df["lifecycle_state"].isin(["revoked", "expired"])
+            non_active_mandates = mandates_df[
+                mandates_df["lifecycle_state"].isin(["paused", "revoked", "expired"])
             ].to_dict("records")
-            mandate = rng.choice(revoked_mandates) if revoked_mandates else rng.choice(all_mandates)
+            mandate = rng.choice(non_active_mandates) if non_active_mandates else rng.choice(all_mandates)
         else:
             mandate = rng.choice(active_mandates) if active_mandates else rng.choice(all_mandates)
 
@@ -710,10 +736,10 @@ def generate_transactions(
         attack_data = attack_generators[attack_class](rng, mandate, txn_time, config)
         amount = attack_data["amount"]
 
-        # A4: force off-window timestamp
+        # Time window handling
+        tw_start = mandate["time_window_start_hour"]
+        tw_end = mandate["time_window_end_hour"]
         if attack_data.get("force_off_window"):
-            tw_start = mandate["time_window_start_hour"]
-            tw_end = mandate["time_window_end_hour"]
             if tw_end > tw_start:
                 # Pick an hour outside [start, end)
                 off_hours = list(range(0, tw_start)) + list(range(tw_end, 24))
@@ -723,6 +749,16 @@ def generate_transactions(
                 txn_time = txn_time.replace(
                     hour=int(rng.integers(tw_end, tw_start))
                 )
+        else:
+            # Attacks that don't violate time window stay within bounds
+            if tw_end > tw_start:
+                txn_time = txn_time.replace(
+                    hour=int(rng.integers(tw_start, tw_end))
+                )
+            else:
+                valid_hours = list(range(tw_start, 24)) + list(range(0, tw_end))
+                if valid_hours:
+                    txn_time = txn_time.replace(hour=rng.choice(valid_hours))
 
         # Cart: A6 gets mismatched cart, others get normal
         is_a6 = attack_class == "A6_injected_intent"
@@ -785,6 +821,22 @@ def generate_transactions(
     # Sort by timestamp
     txn_df = txn_df.sort_values("timestamp").reset_index(drop=True)
     events_df = events_df.sort_values("timestamp").reset_index(drop=True)
+
+    # Compute true chronological cumulative spend per mandate
+    txn_df["cumulative_mandate_spend"] = (
+        txn_df.groupby("mandate_id")["amount"].cumsum().round(2)
+    )
+
+    # For A5 attacks (slow drain), simulate budget exhaustion
+    limit_map = dict(zip(mandates_df["mandate_id"], mandates_df["cumulative_spend_limit"]))
+    a5_indices = txn_df[txn_df["attack_class"] == "A5_slow_drain"].index
+    for idx in a5_indices:
+        m_id = txn_df.at[idx, "mandate_id"]
+        lim = limit_map.get(m_id, 100000.0)
+        curr = txn_df.at[idx, "cumulative_mandate_spend"]
+        if curr <= lim:
+            amt = txn_df.at[idx, "amount"]
+            txn_df.at[idx, "cumulative_mandate_spend"] = round(lim + amt * float(rng.uniform(1.2, 5.0)), 2)
 
     # Log stats
     logger.info(

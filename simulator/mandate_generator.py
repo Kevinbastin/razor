@@ -104,17 +104,35 @@ def generate_mandates(config: SimulatorConfig) -> pd.DataFrame:
         rule_weights = list(mc.amount_rule_weights.values())
         amount_rule = _weighted_choice(rng, rule_keys, rule_weights)
 
-        # Permitted categories (1-3 MCCs per mandate)
-        n_cats = rng.integers(1, 4)
-        cat_weights = [c["weight"] for c in merc.permitted_categories]
-        cat_indices = rng.choice(
-            len(merc.permitted_categories),
-            size=min(n_cats, len(merc.permitted_categories)),
-            replace=False,
-            p=np.array(cat_weights) / sum(cat_weights),
-        )
-        permitted_mccs = [merc.permitted_categories[j]["mcc"] for j in cat_indices]
-        permitted_cat_names = [merc.permitted_categories[j]["name"] for j in cat_indices]
+        # Purpose string — select FIRST so we can align categories
+        purpose_template = rng.choice(merc.purpose_templates)
+        purpose = purpose_template["purpose"].format(amount=amount_ceiling)
+
+        # Permitted categories — MUST include the purpose template's categories
+        # to ensure data consistency (legitimate carts use purpose categories)
+        purpose_cat_names = set(purpose_template["categories"])
+        purpose_mccs = set()
+        for cat_name in purpose_cat_names:
+            for c in merc.permitted_categories:
+                if c["name"] == cat_name:
+                    purpose_mccs.add(c["mcc"])
+
+        # Optionally add 0-2 extra random categories
+        n_extra = int(rng.integers(0, 3))
+        if n_extra > 0:
+            cat_weights = [c["weight"] for c in merc.permitted_categories]
+            extra_indices = rng.choice(
+                len(merc.permitted_categories),
+                size=min(n_extra, len(merc.permitted_categories)),
+                replace=False,
+                p=np.array(cat_weights) / sum(cat_weights),
+            )
+            for j in extra_indices:
+                purpose_cat_names.add(merc.permitted_categories[j]["name"])
+                purpose_mccs.add(merc.permitted_categories[j]["mcc"])
+
+        permitted_mccs = sorted(purpose_mccs)
+        permitted_cat_names = sorted(purpose_cat_names)
 
         # Time window
         tw_weights = [tw["weight"] for tw in mc.time_window_profiles]
@@ -124,10 +142,6 @@ def generate_mandates(config: SimulatorConfig) -> pd.DataFrame:
         cad_keys = list(mc.cadence_weights.keys())
         cad_weights = list(mc.cadence_weights.values())
         cadence = _weighted_choice(rng, cad_keys, cad_weights)
-
-        # Purpose string
-        purpose_template = rng.choice(merc.purpose_templates)
-        purpose = purpose_template["purpose"].format(amount=amount_ceiling)
 
         # Lifecycle state
         state_keys = list(mc.lifecycle_weights.keys())
@@ -198,10 +212,10 @@ def generate_mandates(config: SimulatorConfig) -> pd.DataFrame:
 def _cadence_multiplier(cadence: str, duration_days: int) -> int:
     """Estimate max number of transactions for cumulative limit."""
     cycles = {
-        "daily": duration_days,
-        "weekly": duration_days // 7,
-        "biweekly": duration_days // 14,
-        "monthly": duration_days // 30,
-        "on_demand": duration_days // 3,  # conservative estimate
+        "daily": max(duration_days, 180),
+        "weekly": max(duration_days // 7 * 4, 150),
+        "biweekly": max(duration_days // 14 * 6, 150),
+        "monthly": max(duration_days // 30 * 12, 150),
+        "on_demand": max(duration_days, 180),
     }
-    return max(cycles.get(cadence, duration_days // 7), 1)
+    return max(cycles.get(cadence, 150), 150)
