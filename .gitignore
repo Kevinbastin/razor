@@ -40,8 +40,11 @@ models/*.bin
 
 # Results (track selectively)
 results/*.csv
-results/*.json
+!results/holdout_split.json
 !results/.gitkeep
+
+# Simulator generated data (regenerable via python -m simulator.run)
+simulator/data/
 
 # Node (if console grows)
 node_modules/

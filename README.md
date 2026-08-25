@@ -35,9 +35,23 @@ uvicorn main:app --reload
 
 ## Tech Stack
 
-- **Backend:** Python 3.11, FastAPI, pandas, scikit-learn, xgboost
+- **Backend:** Python 3.12, FastAPI, pandas, scikit-learn, xgboost
 - **Console:** Vanilla HTML + JS + CSS
 - **APIs:** Razorpay Mandate & Disputes (test mode)
+
+## Synthetic Data
+
+Generate the training dataset (500 mandates, ~50K transactions, ~263K session events):
+
+```bash
+python -m simulator.run --seed 42 --output-dir simulator/data
+```
+
+See [docs/simulator.md](docs/simulator.md) for full schema, attack classes, and regeneration guide.
+
+> **⚠️ WARNING: DO NOT regenerate or modify `results/holdout_split.json` after
+> initial creation.** The held-out evaluation split (20% of mandates) is frozen
+> per Design Principle #4. Touching it invalidates all evaluation results.
 
 ## License
 
