@@ -14,5 +14,12 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements.txt
-      - run: python -m pytest tests -q
-      - run: python scripts/check_layer2_regression.py results/layer2_model.joblib
+      - name: Run test suite
+        run: python -m pytest tests -q
+      - name: Check Layer 2 regression (if model and data are present)
+        run: |
+          if [ -f "results/layer2_model.joblib" ] && [ -f "simulator/data/transactions.parquet" ]; then
+            python scripts/check_layer2_regression.py results/layer2_model.joblib
+          else
+            echo "Skipping offline dataset regression check (large model/parquet files are gitignored)."
+          fi
