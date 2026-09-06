@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 
 import structlog
+from observability.metrics import METRICS
 
 logger = structlog.get_logger(__name__)
 
@@ -699,9 +700,12 @@ def verify_transaction(
         "primary_agent_type": mandate.get("primary_agent_type"),
     }
 
-    return VerificationResult(
+    output = VerificationResult(
         verdict=verdict,
         failed_checks=failed_checks,
         evidence=evidence,
         mandate_snapshot=mandate_snapshot,
     )
+    logger.info("layer1_decision", transaction_id=transaction.get("transaction_id"), mandate_id=transaction.get("mandate_id"), verdict=output.verdict, failed_checks=output.failed_checks)
+    METRICS.record("layer1", output.verdict, actual_legitimate=transaction.get("label") == "legitimate" if "label" in transaction else None)
+    return output

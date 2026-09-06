@@ -1,0 +1,27 @@
+{
+  "actions": [
+    {
+      "action": "revoke",
+      "reviewer": "demo",
+      "target_id": "UMN6C4536FC2379479D",
+      "target_type": "mandate"
+    },
+    {
+      "action": "contest",
+      "reviewer": "demo",
+      "target_id": "TXN_90086BC17BEF",
+      "target_type": "transaction"
+    }
+  ],
+  "mandates": {
+    "UMN6C4536FC2379479D": {
+      "state": "revoked"
+    }
+  },
+  "transactions": {
+    "TXN_90086BC17BEF": {
+      "status": "pending review",
+      "timestamp": "Updated just now"
+    }
+  }
+}

@@ -20,7 +20,7 @@ Attack Classes:
 import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -98,6 +98,7 @@ def _generate_session_events(
     is_attack: bool,
     attack_class: str,
     include_retry: bool = False,
+    token_pool: Optional[List[str]] = None,
 ) -> List[dict]:
     """
     Generate step-by-step API call sequence for a transaction session.
@@ -122,7 +123,15 @@ def _generate_session_events(
 
     events = []
     current_time = txn_time
-    consent_token = hashlib.sha256(f"{txn_id}_{mandate_id}".encode()).hexdigest()[:16]
+
+    # Generate fresh consent token or replay existing
+    if is_attack and attack_class == "A1_consent_replay" and token_pool and len(token_pool) > 0:
+        consent_token = str(rng.choice(token_pool))
+    else:
+        consent_token = hashlib.sha256(f"{txn_id}_{mandate_id}".encode()).hexdigest()[:16]
+        if token_pool is not None:
+            token_pool.append(consent_token)
+
     session_id = f"SES_{uuid.uuid4().hex[:12].upper()}"
 
     # Decide how many steps (some agents skip optional steps)
@@ -143,8 +152,6 @@ def _generate_session_events(
     # Attack-specific sequence mutations
     if is_attack:
         if attack_class == "A1_consent_replay":
-            # Reuse a consent token from a "previous" session
-            consent_token = f"REPLAY_{consent_token[:10]}"
             # Slightly faster — skips validation sometimes
             if "validate_mandate" in active_steps and rng.random() < 0.3:
                 pass  # keep it but timing will be abnormal
@@ -156,10 +163,9 @@ def _generate_session_events(
             # Looks very normal — keep standard timing
             pass
         elif attack_class == "A6_injected_intent":
-            # Mostly normal flow — the attack is in the payload, not the sequence
-            # But might have a subtle extra step (e.g., redirect)
-            if rng.random() < 0.3:
-                active_steps.insert(-1, "redirect_cart")
+            # A6 simulates LLM prompt injection — normal sequence & timing,
+            # malicious payload is in the cart items (Layer 3 detection)
+            pass
 
     for i, step in enumerate(active_steps):
         # Compute inter-step latency
@@ -546,6 +552,9 @@ def generate_transactions(
     # Cumulative spend tracker per mandate (for A5 slow drain)
     cumulative_spend: Dict[str, float] = {}
 
+    # Pool of legitimate consent tokens (for A1 replay attacks)
+    consent_token_pool: List[str] = []
+
     # ── Generate normal legitimate transactions ──────────────────
     for i in range(n_normal):
         mandate = rng.choice(active_mandates)
@@ -599,6 +608,7 @@ def generate_transactions(
             rng, txn_id, mandate_id, txn_time,
             agent_profile, is_attack=False, attack_class="none",
             include_retry=include_retry,
+            token_pool=consent_token_pool,
         )
         all_session_events.extend(session_events)
 
@@ -672,6 +682,7 @@ def generate_transactions(
             rng, txn_id, mandate_id, txn_time,
             agent_profile, is_attack=False, attack_class="none",
             include_retry=include_retry,
+            token_pool=consent_token_pool,
         )
         all_session_events.extend(session_events)
 
@@ -790,6 +801,7 @@ def generate_transactions(
         session_events = _generate_session_events(
             rng, txn_id, mandate_id, txn_time,
             agent_profile, is_attack=True, attack_class=attack_class,
+            token_pool=consent_token_pool,
         )
         all_session_events.extend(session_events)
 
@@ -817,6 +829,15 @@ def generate_transactions(
     # Build DataFrames
     txn_df = pd.DataFrame(transactions)
     events_df = pd.DataFrame(all_session_events)
+
+    # I2 provenance: A6 models an SEO-poisoned source immediately before
+    # payment; normal sessions use a known, high-reputation merchant source.
+    def _source_exposures(row):
+        observed = (datetime.fromisoformat(row["timestamp"]) - timedelta(seconds=30)).isoformat()
+        if row["attack_class"] == "A6_injected_intent":
+            return [{"url": "https://discount-grocery-offer.example/checkout", "timestamp": observed, "reputation": 0.12, "source_type": "search_result"}]
+        return [{"url": "https://catalog.quickcommerce.example/items", "timestamp": observed, "reputation": 0.95, "source_type": "merchant_catalog"}]
+    txn_df["source_exposures"] = txn_df.apply(_source_exposures, axis=1)
 
     # Sort by timestamp
     txn_df = txn_df.sort_values("timestamp").reset_index(drop=True)

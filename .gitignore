@@ -40,6 +40,7 @@ models/*.bin
 
 # Results (track selectively)
 results/*.csv
+results/*.sqlite
 !results/holdout_split.json
 !results/.gitkeep
 

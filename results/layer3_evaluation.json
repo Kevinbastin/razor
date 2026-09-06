@@ -1,0 +1,22 @@
+{
+  "evaluation_split": "frozen_holdout",
+  "i1_threshold_calibrated_on": "training_mandates_only",
+  "i1_threshold": 0.2705,
+  "embedding_backend": "sentence-transformers/all-MiniLM-L6-v2",
+  "A6_specific_metrics": {
+    "I1": {
+      "tp": 17,
+      "flagged": 17,
+      "a6_total": 69,
+      "precision": 1.0,
+      "recall": 0.2464
+    },
+    "I4": {
+      "tp": 3,
+      "flagged": 8,
+      "a6_total": 69,
+      "precision": 0.375,
+      "recall": 0.0435
+    }
+  }
+}

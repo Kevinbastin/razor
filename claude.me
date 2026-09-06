@@ -492,3 +492,57 @@ Be deliberate about this split — attempting all of it will wreck your core det
 | A one-page runbook and decision log | SOC2-style audit trail |
 
 A judge from a payments company will recognize this split immediately, and recognize it *favorably* — it's exactly how real engineering teams scope a v1. Claiming you built full enterprise infrastructure in a month, when you obviously didn't, reads as less credible than honestly showing you know what production would require and made deliberate, stated tradeoffs to ship a working core in the time you had.
+
+---
+
+## 12. Implementation Addendum — What Exists Beyond This Original Brief
+
+This section records the current repository state. It distinguishes implemented demo-grade controls from controls that still require credentials, live traffic, or production infrastructure; it is not a claim of compliance certification or live-production validation.
+
+| Area | Implemented beyond the original core-layer brief |
+|---|---|
+| Layer 3 attack coverage | I2 content-source provenance now evaluates newly seen or low-reputation domains immediately preceding a transaction. I3 detects embedded imperative/payload-like instructions. The simulator emits representative source exposure data on newly generated datasets. |
+| Layer 3 hardening | A versioned adversarial regression suite covers SEO-poisoned content, hidden imperative text, and fully specified transaction payloads. A local pre-commit hook runs this suite before Layer 3 changes are accepted. |
+| Fail-closed assurance | Chaos tests exercise malformed mandates, missing fields, and out-of-order events, requiring the pipeline to flag or deny rather than silently clear or crash. |
+| Layer 2 governance | Model artifacts carry the data snapshot and feature-set version. A regression gate compares any candidate model with the saved baseline on the identical frozen held-out split and fails on precision or recall regression. |
+| Observability | All four layers emit structured decision logs. A lightweight metrics store tracks verdict counts and rolling false-positive rate. |
+| Evidence operations | Layer 4 persists evidence packets, action audits, reviewer decisions, and queued notifications in a local SQLite audit store. Packets can include fulfillment evidence and reviewer overrides are auditable. |
+| Razorpay resilience | The client uses environment-only credentials, idempotency keys for state changes, transient-failure backoff, and a circuit breaker. It supports mandate and dispute operations, including evidence-document contest flows. |
+| Console experience | The authenticated console includes a guided A6 replay, per-layer verdicts, drill-down reason trails, a dispute queue, reviewer actions, mandate controls, and value counters for a legible screen-recorded demo. |
+| Documentation | README, ARCHITECTURE, threat model, simulator notes, model governance, and a design decision log document operation, measurement, tradeoffs, and limitations. |
+| Platform safeguards | Explicit CORS origins, HTTP security headers, request IDs, separate read/action process-local rate limits, production startup protection against demo credentials, audit-retention cleanup, an authenticated metrics endpoint, and CI enforcement are now included. |
+| Operational readiness | A runbook, incident-response sketch, and a PSI feature-drift gate provide concrete operational procedures and a pre-promotion drift signal. |
+| Integration and audit hardening | Razorpay webhook HMAC verification is implemented. Audit events are chained per merchant with a tamper-evident hash, and production refuses to start without a keyed audit secret. |
+| Policy and live ingestion | An authenticated versioned endpoint now evaluates supplied transactions through all four layers and writes the resulting packet to audit storage. Merchant-specific, versioned policy thresholds for I1 and Layer 2 are available through an authenticated API. Missing Layer 2 feature vectors fail closed. |
+| Attack corpus and demo preparation | The adversarial suite now includes multilingual and imperative-payment variants; a 45-second pitch script is included for the A6 screen recording. |
+| Console operations upgrade | The console now auto-refreshes the transaction feed, supports search and verdict/outcome filters, renders session timelines and source-provenance evidence, exports or prints evidence packets, copies case summaries, confirms irreversible actions, captures review owner/note metadata, displays model/webhook/audit health, and exposes versioned policy controls. The A6 guided replay now uses an on-screen staged animation rather than browser alert dialogs. |
+| Interactive demo behavior | Console dispute and mandate controls now persist safe local demo actions, update the visible feed and mandate state, and record an audit event. They are labelled as demo actions and never call Razorpay unless a separately provisioned live integration flow is used. A reset control returns the display state to its initial scenario. |
+
+### 12.1 Current validation status and non-negotiable limitations
+
+The local suite is currently green (`83 passed` at the latest full run), and the A6 evidence demo runs locally. The following are intentionally recorded as validation gates rather than overstated as complete:
+
+- **Razorpay test-mode verification:** creating, pausing, and disputing live test objects still needs a provisioned test account, credentials, any required TPAP host/device payload, and a usable test dispute. Run `scripts/test_razorpay_testmode.py` once those are available.
+- **Synthetic-data limits:** Layer 2 and Layer 3 measurements demonstrate behavior only on the frozen simulator split; they do not establish performance, fairness, latency, or false-positive rates on real merchant traffic.
+- **I2 calibration:** source reputation and exposure-window thresholds are deterministic demo controls until calibrated with a real reputation provider and observed browsing/session data.
+- **Narrative generation:** Layer 4 can call an LLM only when its environment configuration is supplied; the deterministic liability decision never depends on that call, and the exact grounded prompt is retained for audit.
+- **Demo persistence and notifications:** SQLite and the in-app notification queue are appropriate for this build, but production needs managed storage, retention/access controls, delivery providers, monitoring, and disaster recovery.
+- **Process-local controls:** rate limits, metrics, and audit retention operate in a single application process. Production needs shared rate limiting, durable telemetry, alerting, and independently verified deletion/retention controls.
+- **Tenant isolation:** the local ledger is tagged per merchant, but a production multi-tenant deployment still needs database-enforced row isolation, per-tenant key management, and authorization/RBAC at every API boundary.
+- **Feature ingestion integrity:** the real-time endpoint accepts a supplied Layer 2 feature vector for an explicit integration boundary. Production should derive or cryptographically attest those features from signed server-side event streams rather than trust a browser/client payload.
+- **Console transport:** the demo uses five-second authenticated polling for dependable local playback. A high-volume production deployment should replace this with an authenticated event stream (SSE/WebSocket), backpressure controls, and a durable event broker.
+- **Production roadmap:** live drift dashboards, full RBI/PCI compliance mapping, multi-region failover, full RBAC, rate limiting, and automated retraining promotion remain designed-for roadmap items.
+
+### 12.2 Repeatable final verification
+
+```bash
+python -m pytest tests -q
+python scripts/demo_a6_catch.py
+python scripts/demo_a6_evidence_packet.py
+python scripts/check_layer2_regression.py results/layer2_model.joblib
+
+# Requires valid, provisioned Razorpay test-mode environment variables.
+python scripts/test_razorpay_testmode.py
+```
+
+Keep the frozen evaluation split unchanged when evaluating a retrain. Regenerate simulator data only for a deliberately versioned new snapshot, then re-run the regression gate before promoting a replacement model.

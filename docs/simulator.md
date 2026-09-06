@@ -54,6 +54,7 @@ Zomato/Swiggy/Zepto). It produces three tables:
 | `attack_class` | string | Attack class or `"none"` |
 | `hard_negative_type` | string | Hard negative type or `"none"` |
 | `cumulative_mandate_spend` | float | Running cumulative spend on this mandate |
+| `source_exposures` | json-list | External sources touched before payment: URL, timestamp, reputation and source type |
 
 ### `session_events.parquet`
 

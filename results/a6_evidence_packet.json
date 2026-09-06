@@ -1,0 +1,325 @@
+{
+  "packet_version": "1.0",
+  "generated_at": "2026-09-05T23:30:32.080147+00:00",
+  "transaction": {
+    "transaction_id": "TXN_90086BC17BEF",
+    "mandate_id": "UMN6C4536FC2379479D",
+    "timestamp": "2025-03-10T12:36:27+05:30",
+    "timestamp_epoch_ms": 1741590387000,
+    "amount": 2086.0,
+    "currency": "INR",
+    "cart_items": "[\"cryptocurrency voucher\", \"luxury watch\", \"gaming console\"]",
+    "cart_category": "convenience_stores",
+    "cart_mcc": "5499",
+    "cart_matches_purpose": false,
+    "beneficiary_id": "BEN_BFB3F762",
+    "is_new_beneficiary": false,
+    "agent_type": "cautious_agent",
+    "session_id": "SES_751733D93D47",
+    "label": "attack",
+    "attack_class": "A6_injected_intent",
+    "hard_negative_type": "none",
+    "cumulative_mandate_spend": 20904.0
+  },
+  "mandate_snapshot": {
+    "mandate_id": "UMN6C4536FC2379479D",
+    "payer_vpa": "shruti961@okicici",
+    "payee_vpa": "swiggy.food@razorpay",
+    "amount_ceiling": 2841,
+    "amount_rule": "max",
+    "permitted_mccs": "[\"5411\", \"5499\"]",
+    "permitted_categories": "[\"convenience_stores\", \"grocery_stores\"]",
+    "time_window_start_hour": 6,
+    "time_window_end_hour": 23,
+    "cadence": "monthly",
+    "purpose": "weekly grocery top-up, ~\u20b92841",
+    "purpose_template_idx": 0,
+    "lifecycle_state": "active",
+    "granted_at": "2025-02-27T00:39:00+05:30",
+    "expires_at": "2025-12-04T00:39:00+05:30",
+    "duration_days": 280,
+    "beneficiaries": "[\"BEN_96CDE94A\", \"BEN_6DBF323B\", \"BEN_31A556C6\", \"BEN_E140BF12\", \"BEN_BFB3F762\"]",
+    "primary_agent_type": "cautious_agent",
+    "cumulative_spend_limit": 426150
+  },
+  "layer1": {
+    "verdict": "pass",
+    "failed_checks": [],
+    "evidence": {
+      "V1": {
+        "transaction_amount": 2086.0,
+        "mandate_ceiling": 2841.0,
+        "amount_rule": "max"
+      },
+      "V2": {
+        "transaction_mcc": "5499",
+        "transaction_category": "convenience_stores",
+        "permitted_mccs": [
+          "5411",
+          "5499"
+        ],
+        "permitted_categories": [
+          "convenience_stores",
+          "grocery_stores"
+        ]
+      },
+      "V3": {
+        "transaction_hour": 12,
+        "window_start_hour": 6,
+        "window_end_hour": 23,
+        "transaction_timestamp": "2025-03-10T12:36:27+05:30"
+      },
+      "V4": {
+        "lifecycle_state": "active"
+      },
+      "V5": {
+        "transaction_mandate_id": "UMN6C4536FC2379479D",
+        "mandate_mandate_id": "UMN6C4536FC2379479D",
+        "format_valid": true,
+        "ids_match": true,
+        "in_registry": true
+      },
+      "V6": {
+        "transaction_agent_type": "cautious_agent",
+        "mandate_primary_agent_type": "cautious_agent",
+        "registry_agent_type": "cautious_agent"
+      },
+      "V7": {
+        "cumulative_spend": 20904.0,
+        "spend_limit": 426150.0,
+        "utilization_pct": 4.91
+      },
+      "V8": {
+        "cadence": "monthly",
+        "transaction_timestamp": "2025-03-10T12:36:27+05:30",
+        "min_interval_minutes": 60.0,
+        "most_recent_prior": "2025-03-10T10:12:01+05:30",
+        "gap_hours": 2.41
+      }
+    },
+    "mandate_snapshot": {
+      "mandate_id": "UMN6C4536FC2379479D",
+      "lifecycle_state": "active",
+      "amount_ceiling": 2841,
+      "amount_rule": "max",
+      "cadence": "monthly",
+      "time_window_start_hour": 6,
+      "time_window_end_hour": 23,
+      "granted_at": "2025-02-27T00:39:00+05:30",
+      "expires_at": "2025-12-04T00:39:00+05:30",
+      "cumulative_spend_limit": 426150,
+      "primary_agent_type": "cautious_agent"
+    }
+  },
+  "layer2": {
+    "risk_score": 0.2291,
+    "verdict": "pass",
+    "threshold": 0.5,
+    "top_risk_factors": [
+      {
+        "feature": "txn_amount_ceiling_ratio",
+        "value": 0.7342,
+        "importance_rank": 1,
+        "feature_importance": 456
+      },
+      {
+        "feature": "vel_mandate_txn_count",
+        "value": 10.0,
+        "importance_rank": 2,
+        "feature_importance": 341
+      },
+      {
+        "feature": "txn_cumulative_spend_ratio",
+        "value": 7.358,
+        "importance_rank": 3,
+        "feature_importance": 324
+      },
+      {
+        "feature": "vel_amount_z_score",
+        "value": 0.2479,
+        "importance_rank": 4,
+        "feature_importance": 299
+      }
+    ],
+    "evidence": {
+      "risk_score": 0.2291,
+      "threshold": 0.5,
+      "verdict": "pass",
+      "features_summary": {
+        "seq_skip_ahead": 0,
+        "timing_latency_cv": 0.1884,
+        "cred_token_reused": 0,
+        "vel_burst_score": 0.0,
+        "vel_amount_z_score": 0.2479
+      }
+    },
+    "model_version": "1.0.0"
+  },
+  "layer3": {
+    "verdict": "flagged",
+    "signals_triggered": [
+      "I1"
+    ],
+    "evidence": {
+      "I1": {
+        "similarity_score": 0.0142,
+        "distance": 0.9858,
+        "threshold": 0.2705,
+        "embedding_backend": "tfidf_domain_sentence_embedding",
+        "purpose": "weekly grocery top-up, ~\u20b92841",
+        "cart_description": "Cart contents: cryptocurrency voucher, luxury watch, gaming console. Merchant category: convenience stores."
+      },
+      "I4": {
+        "triggered": false,
+        "beneficiary_id": "BEN_BFB3F762",
+        "first_time_beneficiary": false,
+        "prior_transaction_count": 10,
+        "transaction_amount": 2086.0,
+        "upper_quartile_threshold": 2618.0,
+        "upper_quartile_value": false,
+        "transaction_hour": 12.6,
+        "timing_distance_hours": 1.57,
+        "timing_tolerance_hours": 7.43,
+        "timing_deviates_from_pattern": false,
+        "requires_all": [
+          "first_time_beneficiary",
+          "upper_quartile_value",
+          "timing_deviates_from_pattern"
+        ]
+      },
+      "I3": {
+        "triggered": false,
+        "matches": [],
+        "sources_checked": 0
+      },
+      "I2": {
+        "triggered": false,
+        "immediate_window_seconds": 120,
+        "low_reputation_threshold": 0.35,
+        "known_domains_before_session": [],
+        "immediate_exposures": []
+      }
+    }
+  },
+  "session_timeline": [
+    {
+      "session_id": "SES_751733D93D47",
+      "transaction_id": "TXN_90086BC17BEF",
+      "mandate_id": "UMN6C4536FC2379479D",
+      "step_index": 0,
+      "step_name": "discover_mandate",
+      "timestamp": "2025-03-10T12:36:29.857028+05:30",
+      "timestamp_epoch_ms": 1741590389857,
+      "latency_ms": 2857.0,
+      "status": "success",
+      "consent_token": NaN,
+      "agent_type": "cautious_agent",
+      "is_retry": false
+    },
+    {
+      "session_id": "SES_751733D93D47",
+      "transaction_id": "TXN_90086BC17BEF",
+      "mandate_id": "UMN6C4536FC2379479D",
+      "step_index": 1,
+      "step_name": "validate_mandate",
+      "timestamp": "2025-03-10T12:36:31.829506+05:30",
+      "timestamp_epoch_ms": 1741590391829,
+      "latency_ms": 1972.5,
+      "status": "success",
+      "consent_token": NaN,
+      "agent_type": "cautious_agent",
+      "is_retry": false
+    },
+    {
+      "session_id": "SES_751733D93D47",
+      "transaction_id": "TXN_90086BC17BEF",
+      "mandate_id": "UMN6C4536FC2379479D",
+      "step_index": 2,
+      "step_name": "build_cart",
+      "timestamp": "2025-03-10T12:36:33.892530+05:30",
+      "timestamp_epoch_ms": 1741590393892,
+      "latency_ms": 2063.0,
+      "status": "success",
+      "consent_token": NaN,
+      "agent_type": "cautious_agent",
+      "is_retry": false
+    },
+    {
+      "session_id": "SES_751733D93D47",
+      "transaction_id": "TXN_90086BC17BEF",
+      "mandate_id": "UMN6C4536FC2379479D",
+      "step_index": 3,
+      "step_name": "compute_amount",
+      "timestamp": "2025-03-10T12:36:36.471034+05:30",
+      "timestamp_epoch_ms": 1741590396471,
+      "latency_ms": 2578.5,
+      "status": "success",
+      "consent_token": NaN,
+      "agent_type": "cautious_agent",
+      "is_retry": false
+    },
+    {
+      "session_id": "SES_751733D93D47",
+      "transaction_id": "TXN_90086BC17BEF",
+      "mandate_id": "UMN6C4536FC2379479D",
+      "step_index": 4,
+      "step_name": "check_consent",
+      "timestamp": "2025-03-10T12:36:37.932092+05:30",
+      "timestamp_epoch_ms": 1741590397932,
+      "latency_ms": 1461.1,
+      "status": "success",
+      "consent_token": "ea933548d65452ff",
+      "agent_type": "cautious_agent",
+      "is_retry": false
+    },
+    {
+      "session_id": "SES_751733D93D47",
+      "transaction_id": "TXN_90086BC17BEF",
+      "mandate_id": "UMN6C4536FC2379479D",
+      "step_index": 5,
+      "step_name": "initiate_payment",
+      "timestamp": "2025-03-10T12:36:40.267870+05:30",
+      "timestamp_epoch_ms": 1741590400267,
+      "latency_ms": 2335.8,
+      "status": "success",
+      "consent_token": NaN,
+      "agent_type": "cautious_agent",
+      "is_retry": false
+    },
+    {
+      "session_id": "SES_751733D93D47",
+      "transaction_id": "TXN_90086BC17BEF",
+      "mandate_id": "UMN6C4536FC2379479D",
+      "step_index": 6,
+      "step_name": "confirm_payment",
+      "timestamp": "2025-03-10T12:36:42.450199+05:30",
+      "timestamp_epoch_ms": 1741590402450,
+      "latency_ms": 2182.3,
+      "status": "success",
+      "consent_token": NaN,
+      "agent_type": "cautious_agent",
+      "is_retry": false
+    }
+  ],
+  "fulfillment_evidence": [
+    {
+      "type": "simulated_order_record",
+      "reference": "TXN_90086BC17BEF",
+      "status": "not_fulfilled_due_to_risk_hold"
+    }
+  ],
+  "liability_determination": "escalate-to-provider",
+  "liability_reason": "Authority was valid but Layer 3 found an intent-integrity concern.",
+  "transaction_disposition": "blocked",
+  "auto_responder": {
+    "status": "not_attempted",
+    "action": "pause_mandate",
+    "reason": "no Razorpay client configured"
+  },
+  "narrative": {
+    "status": "not_generated",
+    "reason": "OPENAI_API_KEY and OPENAI_NARRATIVE_MODEL are required",
+    "prompt": "You write a concise dispute-evidence narrative. Use ONLY facts explicitly present in the JSON packet below. Do not infer intent, identity, causation, delivery, account status, or API results. Do not add facts, estimates, legal conclusions, or recommendations. State the packet's deterministic liability determination exactly; do not change it. If a fact is absent, omit it.\n\nEVIDENCE PACKET (sole source of truth):\n{\"auto_responder\": {\"action\": \"pause_mandate\", \"reason\": \"no Razorpay client configured\", \"status\": \"not_attempted\"}, \"fulfillment_evidence\": [{\"reference\": \"TXN_90086BC17BEF\", \"status\": \"not_fulfilled_due_to_risk_hold\", \"type\": \"simulated_order_record\"}], \"generated_at\": \"2026-09-05T23:30:32.080147+00:00\", \"layer1\": {\"evidence\": {\"V1\": {\"amount_rule\": \"max\", \"mandate_ceiling\": 2841.0, \"transaction_amount\": 2086.0}, \"V2\": {\"permitted_categories\": [\"convenience_stores\", \"grocery_stores\"], \"permitted_mccs\": [\"5411\", \"5499\"], \"transaction_category\": \"convenience_stores\", \"transaction_mcc\": \"5499\"}, \"V3\": {\"transaction_hour\": 12, \"transaction_timestamp\": \"2025-03-10T12:36:27+05:30\", \"window_end_hour\": 23, \"window_start_hour\": 6}, \"V4\": {\"lifecycle_state\": \"active\"}, \"V5\": {\"format_valid\": true, \"ids_match\": true, \"in_registry\": true, \"mandate_mandate_id\": \"UMN6C4536FC2379479D\", \"transaction_mandate_id\": \"UMN6C4536FC2379479D\"}, \"V6\": {\"mandate_primary_agent_type\": \"cautious_agent\", \"registry_agent_type\": \"cautious_agent\", \"transaction_agent_type\": \"cautious_agent\"}, \"V7\": {\"cumulative_spend\": 20904.0, \"spend_limit\": 426150.0, \"utilization_pct\": 4.91}, \"V8\": {\"cadence\": \"monthly\", \"gap_hours\": 2.41, \"min_interval_minutes\": 60.0, \"most_recent_prior\": \"2025-03-10T10:12:01+05:30\", \"transaction_timestamp\": \"2025-03-10T12:36:27+05:30\"}}, \"failed_checks\": [], \"mandate_snapshot\": {\"amount_ceiling\": 2841, \"amount_rule\": \"max\", \"cadence\": \"monthly\", \"cumulative_spend_limit\": 426150, \"expires_at\": \"2025-12-04T00:39:00+05:30\", \"granted_at\": \"2025-02-27T00:39:00+05:30\", \"lifecycle_state\": \"active\", \"mandate_id\": \"UMN6C4536FC2379479D\", \"primary_agent_type\": \"cautious_agent\", \"time_window_end_hour\": 23, \"time_window_start_hour\": 6}, \"verdict\": \"pass\"}, \"layer2\": {\"evidence\": {\"features_summary\": {\"cred_token_reused\": 0, \"seq_skip_ahead\": 0, \"timing_latency_cv\": 0.1884, \"vel_amount_z_score\": 0.2479, \"vel_burst_score\": 0.0}, \"risk_score\": 0.2291, \"threshold\": 0.5, \"verdict\": \"pass\"}, \"model_version\": \"1.0.0\", \"risk_score\": 0.2291, \"threshold\": 0.5, \"top_risk_factors\": [{\"feature\": \"txn_amount_ceiling_ratio\", \"feature_importance\": 456, \"importance_rank\": 1, \"value\": 0.7342}, {\"feature\": \"vel_mandate_txn_count\", \"feature_importance\": 341, \"importance_rank\": 2, \"value\": 10.0}, {\"feature\": \"txn_cumulative_spend_ratio\", \"feature_importance\": 324, \"importance_rank\": 3, \"value\": 7.358}, {\"feature\": \"vel_amount_z_score\", \"feature_importance\": 299, \"importance_rank\": 4, \"value\": 0.2479}], \"verdict\": \"pass\"}, \"layer3\": {\"evidence\": {\"I1\": {\"cart_description\": \"Cart contents: cryptocurrency voucher, luxury watch, gaming console. Merchant category: convenience stores.\", \"distance\": 0.9858, \"embedding_backend\": \"tfidf_domain_sentence_embedding\", \"purpose\": \"weekly grocery top-up, ~\\u20b92841\", \"similarity_score\": 0.0142, \"threshold\": 0.2705}, \"I2\": {\"immediate_exposures\": [], \"immediate_window_seconds\": 120, \"known_domains_before_session\": [], \"low_reputation_threshold\": 0.35, \"triggered\": false}, \"I3\": {\"matches\": [], \"sources_checked\": 0, \"triggered\": false}, \"I4\": {\"beneficiary_id\": \"BEN_BFB3F762\", \"first_time_beneficiary\": false, \"prior_transaction_count\": 10, \"requires_all\": [\"first_time_beneficiary\", \"upper_quartile_value\", \"timing_deviates_from_pattern\"], \"timing_deviates_from_pattern\": false, \"timing_distance_hours\": 1.57, \"timing_tolerance_hours\": 7.43, \"transaction_amount\": 2086.0, \"transaction_hour\": 12.6, \"triggered\": false, \"upper_quartile_threshold\": 2618.0, \"upper_quartile_value\": false}}, \"signals_triggered\": [\"I1\"], \"verdict\": \"flagged\"}, \"liability_determination\": \"escalate-to-provider\", \"liability_reason\": \"Authority was valid but Layer 3 found an intent-integrity concern.\", \"mandate_snapshot\": {\"amount_ceiling\": 2841, \"amount_rule\": \"max\", \"beneficiaries\": \"[\\\"BEN_96CDE94A\\\", \\\"BEN_6DBF323B\\\", \\\"BEN_31A556C6\\\", \\\"BEN_E140BF12\\\", \\\"BEN_BFB3F762\\\"]\", \"cadence\": \"monthly\", \"cumulative_spend_limit\": 426150, \"duration_days\": 280, \"expires_at\": \"2025-12-04T00:39:00+05:30\", \"granted_at\": \"2025-02-27T00:39:00+05:30\", \"lifecycle_state\": \"active\", \"mandate_id\": \"UMN6C4536FC2379479D\", \"payee_vpa\": \"swiggy.food@razorpay\", \"payer_vpa\": \"shruti961@okicici\", \"permitted_categories\": \"[\\\"convenience_stores\\\", \\\"grocery_stores\\\"]\", \"permitted_mccs\": \"[\\\"5411\\\", \\\"5499\\\"]\", \"primary_agent_type\": \"cautious_agent\", \"purpose\": \"weekly grocery top-up, ~\\u20b92841\", \"purpose_template_idx\": 0, \"time_window_end_hour\": 23, \"time_window_start_hour\": 6}, \"narrative\": null, \"packet_version\": \"1.0\", \"session_timeline\": [{\"agent_type\": \"cautious_agent\", \"consent_token\": NaN, \"is_retry\": false, \"latency_ms\": 2857.0, \"mandate_id\": \"UMN6C4536FC2379479D\", \"session_id\": \"SES_751733D93D47\", \"status\": \"success\", \"step_index\": 0, \"step_name\": \"discover_mandate\", \"timestamp\": \"2025-03-10T12:36:29.857028+05:30\", \"timestamp_epoch_ms\": 1741590389857, \"transaction_id\": \"TXN_90086BC17BEF\"}, {\"agent_type\": \"cautious_agent\", \"consent_token\": NaN, \"is_retry\": false, \"latency_ms\": 1972.5, \"mandate_id\": \"UMN6C4536FC2379479D\", \"session_id\": \"SES_751733D93D47\", \"status\": \"success\", \"step_index\": 1, \"step_name\": \"validate_mandate\", \"timestamp\": \"2025-03-10T12:36:31.829506+05:30\", \"timestamp_epoch_ms\": 1741590391829, \"transaction_id\": \"TXN_90086BC17BEF\"}, {\"agent_type\": \"cautious_agent\", \"consent_token\": NaN, \"is_retry\": false, \"latency_ms\": 2063.0, \"mandate_id\": \"UMN6C4536FC2379479D\", \"session_id\": \"SES_751733D93D47\", \"status\": \"success\", \"step_index\": 2, \"step_name\": \"build_cart\", \"timestamp\": \"2025-03-10T12:36:33.892530+05:30\", \"timestamp_epoch_ms\": 1741590393892, \"transaction_id\": \"TXN_90086BC17BEF\"}, {\"agent_type\": \"cautious_agent\", \"consent_token\": NaN, \"is_retry\": false, \"latency_ms\": 2578.5, \"mandate_id\": \"UMN6C4536FC2379479D\", \"session_id\": \"SES_751733D93D47\", \"status\": \"success\", \"step_index\": 3, \"step_name\": \"compute_amount\", \"timestamp\": \"2025-03-10T12:36:36.471034+05:30\", \"timestamp_epoch_ms\": 1741590396471, \"transaction_id\": \"TXN_90086BC17BEF\"}, {\"agent_type\": \"cautious_agent\", \"consent_token\": \"ea933548d65452ff\", \"is_retry\": false, \"latency_ms\": 1461.1, \"mandate_id\": \"UMN6C4536FC2379479D\", \"session_id\": \"SES_751733D93D47\", \"status\": \"success\", \"step_index\": 4, \"step_name\": \"check_consent\", \"timestamp\": \"2025-03-10T12:36:37.932092+05:30\", \"timestamp_epoch_ms\": 1741590397932, \"transaction_id\": \"TXN_90086BC17BEF\"}, {\"agent_type\": \"cautious_agent\", \"consent_token\": NaN, \"is_retry\": false, \"latency_ms\": 2335.8, \"mandate_id\": \"UMN6C4536FC2379479D\", \"session_id\": \"SES_751733D93D47\", \"status\": \"success\", \"step_index\": 5, \"step_name\": \"initiate_payment\", \"timestamp\": \"2025-03-10T12:36:40.267870+05:30\", \"timestamp_epoch_ms\": 1741590400267, \"transaction_id\": \"TXN_90086BC17BEF\"}, {\"agent_type\": \"cautious_agent\", \"consent_token\": NaN, \"is_retry\": false, \"latency_ms\": 2182.3, \"mandate_id\": \"UMN6C4536FC2379479D\", \"session_id\": \"SES_751733D93D47\", \"status\": \"success\", \"step_index\": 6, \"step_name\": \"confirm_payment\", \"timestamp\": \"2025-03-10T12:36:42.450199+05:30\", \"timestamp_epoch_ms\": 1741590402450, \"transaction_id\": \"TXN_90086BC17BEF\"}], \"transaction\": {\"agent_type\": \"cautious_agent\", \"amount\": 2086.0, \"attack_class\": \"A6_injected_intent\", \"beneficiary_id\": \"BEN_BFB3F762\", \"cart_category\": \"convenience_stores\", \"cart_items\": \"[\\\"cryptocurrency voucher\\\", \\\"luxury watch\\\", \\\"gaming console\\\"]\", \"cart_matches_purpose\": false, \"cart_mcc\": \"5499\", \"cumulative_mandate_spend\": 20904.0, \"currency\": \"INR\", \"hard_negative_type\": \"none\", \"is_new_beneficiary\": false, \"label\": \"attack\", \"mandate_id\": \"UMN6C4536FC2379479D\", \"session_id\": \"SES_751733D93D47\", \"timestamp\": \"2025-03-10T12:36:27+05:30\", \"timestamp_epoch_ms\": 1741590387000, \"transaction_id\": \"TXN_90086BC17BEF\"}, \"transaction_disposition\": \"blocked\"}\n\nWrite 2-4 plain-English paragraphs for a dispute reviewer.",
+    "narrative": null
+  }
+}

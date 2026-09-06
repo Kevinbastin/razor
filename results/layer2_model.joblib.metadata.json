@@ -1,0 +1,6 @@
+{
+  "model_version": "1.0.0",
+  "data_snapshot_version": "simulator-1.0.0-seed-42",
+  "feature_set_version": "24c4ddd6696c",
+  "feature_columns": "see model artifact feature_names"
+}

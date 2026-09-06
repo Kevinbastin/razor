@@ -4,70 +4,220 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATRL — Agent Transaction Risk Layer</title>
-    <meta name="description" content="Monitoring console for the Agent Transaction Risk Layer — four-layer risk system for AI-agent-initiated payments.">
+    <meta name="description" content="Fraud-ops console for the Agent Transaction Risk Layer — four-layer risk system for AI-agent-initiated payments.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="app">
+
+        <!-- Offline banner — hidden by default, shown by JS when API unreachable -->
+        <div class="offline-banner" id="offline-banner" hidden>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><line x1="8" y1="4.5" x2="8" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.5" r="1" fill="currentColor"/></svg>
+            <span>API unreachable — data may be stale</span>
+        </div>
+
         <!-- Header -->
         <header class="header">
             <div class="header-left">
                 <div class="logo">
-                    <span class="logo-icon">◆</span>
+                    <!-- Shield / ledger glyph — domain-specific, not a generic diamond -->
+                    <svg class="logo-icon" width="18" height="20" viewBox="0 0 18 20" fill="none">
+                        <path d="M9 1L1.5 4.5V9.5C1.5 14 5 17.5 9 19C13 17.5 16.5 14 16.5 9.5V4.5L9 1Z" stroke="var(--accent-amber)" stroke-width="1.4" fill="none"/>
+                        <path d="M6 10L8.5 12.5L12.5 7.5" stroke="var(--accent-pass)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                     <span class="logo-text">ATRL</span>
                 </div>
                 <span class="header-divider"></span>
                 <span class="header-subtitle">Agent Transaction Risk Layer</span>
             </div>
             <div class="header-right">
-                <div class="status-badge" id="api-status">
+                <div class="status-chip" id="api-status">
                     <span class="status-dot"></span>
-                    <span class="status-text">Checking...</span>
+                    <span class="status-text">Connecting…</span>
                 </div>
+                <span class="refresh-indicator" id="refresh-indicator" title="Auto-refresh active"></span>
             </div>
         </header>
 
-        <!-- Main Content -->
         <main class="main">
-            <!-- Stats Row -->
-            <section class="stats-row" id="stats-row">
-                <div class="stat-card">
-                    <div class="stat-label">Transactions Scored</div>
-                    <div class="stat-value" id="stat-scored">—</div>
+
+            <!-- Hero — the A6 pitch moment -->
+            <section class="hero">
+                <div class="hero-copy">
+                    <h1>Authority can be valid.<br><em>Intent can still be hijacked.</em></h1>
+                    <p class="hero-sub">Four layers verify mandate scope, session behaviour, and purchase intent — then generate the dispute evidence. The demo below replays an A6 prompt-injection attack live.</p>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label">Blocked (L1)</div>
-                    <div class="stat-value stat-danger" id="stat-blocked-l1">—</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Flagged (L2+L3)</div>
-                    <div class="stat-value stat-warning" id="stat-flagged">—</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Disputes Filed</div>
-                    <div class="stat-value stat-info" id="stat-disputes">—</div>
+                <div class="hero-controls">
+                    <button id="run-a6" class="btn btn-primary">Replay A6 attack</button>
+                    <div class="hero-secondary">
+                        <button id="refresh" class="btn btn-ghost">Refresh</button>
+                        <button id="reset-demo" class="btn btn-ghost">Reset demo</button>
+                    </div>
                 </div>
             </section>
 
-            <!-- Placeholder Panels -->
-            <section class="panels">
-                <div class="panel">
-                    <h2 class="panel-title">Layer Pipeline</h2>
-                    <p class="panel-placeholder">Pipeline visualization will appear here once layers are implemented.</p>
+            <!-- A6 stepper — the animated 4-step walkthrough -->
+            <section class="stepper" id="a6-stepper">
+                <div class="step" data-step="1">
+                    <div class="step-marker">L1</div>
+                    <div class="step-body">
+                        <strong>Mandate verifier</strong>
+                        <span class="step-result" id="step-1-result">—</span>
+                    </div>
                 </div>
+                <div class="step-connector"></div>
+                <div class="step" data-step="2">
+                    <div class="step-marker">L2</div>
+                    <div class="step-body">
+                        <strong>Behavioural detector</strong>
+                        <span class="step-result" id="step-2-result">—</span>
+                    </div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step" data-step="3">
+                    <div class="step-marker">L3</div>
+                    <div class="step-body">
+                        <strong>Intent integrity</strong>
+                        <span class="step-result" id="step-3-result">—</span>
+                    </div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="step" data-step="4">
+                    <div class="step-marker">L4</div>
+                    <div class="step-body">
+                        <strong>Evidence &amp; liability</strong>
+                        <span class="step-result" id="step-4-result">—</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Metrics row — dominant card + supporting stats -->
+            <section class="metrics">
+                <div class="metric-primary">
+                    <span class="metric-value mono" id="defended">—</span>
+                    <span class="metric-label">Value defended</span>
+                    <span class="metric-context">Sum of blocked high-confidence attack amounts</span>
+                </div>
+                <div class="metric-secondary">
+                    <div class="metric-small">
+                        <span class="metric-value mono" id="auto-resolved">—</span>
+                        <span class="metric-label">Disputes auto-resolved</span>
+                        <span class="metric-context">Evidence packets accepted without escalation</span>
+                    </div>
+                    <div class="metric-small">
+                        <span class="metric-value mono" id="fp-avoided">—</span>
+                        <span class="metric-label">False positives avoided</span>
+                        <span class="metric-context">Legitimate transactions recovered via step-up re-auth</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Transaction feed + drill-down -->
+            <section class="workspace">
+                <div class="panel panel-feed">
+                    <div class="panel-header">
+                        <h2>Transaction feed</h2>
+                    </div>
+                    <div class="feed-filters">
+                        <input id="search" type="search" placeholder="Search transactions…" aria-label="Search transactions">
+                        <select id="l3-filter" aria-label="Filter by Layer 3 verdict">
+                            <option value="all">All L3 verdicts</option>
+                            <option value="flagged">Flagged</option>
+                            <option value="clear">Clear</option>
+                        </select>
+                        <select id="status-filter" aria-label="Filter by outcome">
+                            <option value="all">All outcomes</option>
+                            <option value="blocked">Blocked</option>
+                            <option value="pending re-authorization">Step-up</option>
+                            <option value="approved">Approved</option>
+                        </select>
+                    </div>
+                    <div class="feed-table-wrap">
+                        <table class="feed-table" id="transaction-feed">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Mandate</th>
+                                    <th class="col-amount">Amount</th>
+                                    <th>L1</th>
+                                    <th>L2</th>
+                                    <th>L3</th>
+                                    <th>Verdict</th>
+                                </tr>
+                            </thead>
+                            <tbody id="feed-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <aside class="panel panel-detail" id="detail">
+                    <div class="panel-header">
+                        <h2>Evidence trail</h2>
+                    </div>
+                    <p class="panel-empty">Select a transaction row to inspect its full evidence packet.</p>
+                </aside>
+            </section>
+
+            <!-- Lower panels — dispute, mandate, policy, system -->
+            <section class="lower-grid">
                 <div class="panel">
-                    <h2 class="panel-title">Recent Decisions</h2>
-                    <p class="panel-placeholder">Transaction decisions will stream here in real time.</p>
+                    <div class="panel-header">
+                        <h2>Dispute queue</h2>
+                        <span class="count-badge" id="dispute-count">0</span>
+                    </div>
+                    <div id="dispute-queue"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Mandate management</h2>
+                        <span class="count-badge" id="mandate-count">0</span>
+                    </div>
+                    <div id="mandate-list"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Merchant policy</h2>
+                    </div>
+                    <form id="policy-form" class="policy-form">
+                        <div class="form-field">
+                            <label for="i1-threshold">I1 semantic divergence threshold</label>
+                            <input id="i1-threshold" name="i1_threshold" type="number" min="0.01" max="0.99" step="0.01">
+                            <span class="form-help">Cosine similarity below this flags intent divergence (lower = stricter)</span>
+                        </div>
+                        <div class="form-field">
+                            <label for="l2-suspicious">L2 suspicious threshold</label>
+                            <input id="l2-suspicious" name="layer2_suspicious_threshold" type="number" min="0.01" max="0.99" step="0.01">
+                            <span class="form-help">Risk score above this triggers step-up re-authorisation</span>
+                        </div>
+                        <div class="form-field">
+                            <label for="l2-attack">L2 attack threshold</label>
+                            <input id="l2-attack" name="layer2_attack_threshold" type="number" min="0.01" max="0.99" step="0.01">
+                            <span class="form-help">Risk score above this blocks and generates a dispute packet</span>
+                        </div>
+                        <div class="form-footer">
+                            <span class="muted mono" id="policy-version"></span>
+                            <button class="btn btn-primary" type="submit">Save policy</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>System health</h2>
+                    </div>
+                    <div id="system-health" class="health-list"></div>
                 </div>
             </section>
         </main>
 
-        <!-- Footer -->
         <footer class="footer">
-            <span>Razorpay AI Builder · Track 02 · v0.1.0</span>
+            <span>Razorpay AI Builder — Track 02 — v0.1.0</span>
         </footer>
     </div>
 

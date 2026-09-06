@@ -1,0 +1,3 @@
+# Incident response sketch
+
+**Detect → contain → preserve → review → recover → learn.** A Layer 3 hijack signal or strong replay signal creates an evidence packet, records the decision trail, and routes the transaction to the deterministic liability policy. For an active mandate, `fraud-contest` and `escalate-to-provider` require a pause attempt; the result is audited rather than assumed. A reviewer receives the queued notification, verifies the state with Razorpay, and decides whether to accept, contest, or request more evidence. Preserve the original packet and session timeline, minimize any exported customer data, and add a sanitized regression case after post-incident review.

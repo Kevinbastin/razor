@@ -7,3 +7,7 @@ transaction is technically valid and in-scope:
 - First-time-beneficiary + high-value + off-pattern combos
 - Content-source provenance analysis
 """
+
+from layer3_intent.detector import IntentIntegrityDetector, IntentIntegrityResult, cart_description
+
+__all__ = ["IntentIntegrityDetector", "IntentIntegrityResult", "cart_description"]

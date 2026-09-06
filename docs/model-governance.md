@@ -1,0 +1,3 @@
+# Model governance
+
+Layer 2 is retrained only after a material labelled-data change, a monitored performance decline, or a feature-set change. Every artifact writes a sidecar metadata file containing its model version, feature-set hash and ordered feature list; production additionally records the immutable simulator/data snapshot version. Before promotion, `scripts/check_layer2_regression.py` compares the candidate with the deployed artifact on the unchanged frozen mandate holdout and rejects any precision or recall regression. Rollback is a pointer change to the prior joblib artifact and its matching metadata; the frozen split and prior artifact are retained so the decision is reproducible.
